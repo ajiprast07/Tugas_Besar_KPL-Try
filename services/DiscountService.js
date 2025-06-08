@@ -18,7 +18,7 @@ class DiscountService {
       // Default rules if file fails to load
       this.discountRules = {
         'Sabun': 0.1,
-        'Sembako': 0.3,
+        'Sembako': 0.2,
         'Food': 0.05
       };
     }
