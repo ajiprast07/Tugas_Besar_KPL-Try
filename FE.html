@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Manajemen Produk</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .navbar-brand {
+            font-weight: 600;
+        }
+        .card {
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            border: 1px solid rgba(0, 0, 0, 0.125);
+        }
+        .card-header {
+            background-color: #fff;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+            font-weight: 500;
+        }
+        .btn-group-sm .btn {
+            font-size: 0.875rem;
+        }
+        .table th {
+            background-color: #f8f9fa;
+            font-weight: 500;
+        }
+        .badge {
+            font-size: 0.75em;
+        }
+        .loading {
+            display: none;
+        }
+        .category-badge {
+            font-size: 0.8em;
+        }
+        .price-display {
+            font-weight: 500;
+            color: #28a745;
+        }
+        .stock-low {
+            color: #dc3545;
+        }
+        .stock-medium {
+            color: #fd7e14;
+        }
+        .stock-high {
+            color: #28a745;
+        }
+        .connection-status {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 1050;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+        .status-connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status-disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .offline-mode {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+            padding: 1rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-shop"></i> Sistem Manajemen Produk
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#" onclick="showProducts()">
+                            <i class="bi bi-box-seam"></i> Produk
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="showTransactions()">
+                            <i class="bi bi-receipt"></i> Transaksi
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="testConnection()">
+                            <i class="bi bi-wifi"></i> Test Koneksi
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div id="connection-status" class="connection-status status-disconnected" style="display: none;">
+        <i class="bi bi-wifi-off"></i> Tidak terhubung ke server
+    </div>
+
+    <div class="container mt-4">
+        <div id="alert-container"></div>
+        
+        <div id="offline-warning" class="offline-mode" style="display: none;">
+            <i class="bi bi-exclamation-triangle"></i>
+            <strong>Mode Offline:</strong> Tidak dapat terhubung ke server backend. Data akan disimpan sementara di browser dan akan hilang saat halaman di-refresh.
+            <button class="btn btn-sm btn-warning ms-2" onclick="testConnection()">
+                <i class="bi bi-arrow-clockwise"></i> Test Koneksi
+            </button>
+        </div>
+
+        <div id="products-section">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="bi bi-plus-circle"></i> Tambah Produk
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="product-form">
+                                <div class="mb-3">
+                                    <label for="product-name" class="form-label">Nama Produk</label>
+                                    <input type="text" class="form-control" id="product-name" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="product-price" class="form-label">Harga</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">Rp</span>
+                                        <input type="number" class="form-control" id="product-price" min="1" required>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="product-category" class="form-label">Kategori</label>
+                                    <select class="form-select" id="product-category" required>
+                                        <option value="">Pilih Kategori</option>
+                                        <option value="Sabun">Sabun</option>
+                                        <option value="Sembako">Sembako</option>
+                                        <option value="Food">Food</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="product-stock" class="form-label">Stok</label>
+                                    <input type="number" class="form-control" id="product-stock" min="0" required>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="bi bi-plus"></i> Tambah Produk
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <i class="bi bi-list-ul"></i> Daftar Produk
+                            </h5>
+                            <button class="btn btn-outline-primary btn-sm" onclick="loadProducts()">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Nama</th>
+                                            <th>Harga</th>
+                                            <th>Kategori</th>
+                                            <th>Stok</th>
+                                            <th>Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="products-table">
+                                        <tr>
+                                            <td colspan="5" class="text-center">
+                                                <div class="loading">
+                                                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                                                    Loading...
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="transactions-section" style="display: none;">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="bi bi-cart-plus"></i> Buat Transaksi
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="transaction-form">
+                                <div class="mb-3">
+                                    <label for="transaction-product" class="form-label">Pilih Produk</label>
+                                    <select class="form-select" id="transaction-product" required>
+                                        <option value="">Pilih Produk</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="transaction-quantity" class="form-label">Jumlah</label>
+                                    <input type="number" class="form-control" id="transaction-quantity" min="1" required>
+                                </div>
+                                <div class="mb-3" id="product-info" style="display: none;">
+                                    <div class="alert alert-info">
+                                        <small>
+                                            <strong>Info Produk:</strong><br>
+                                            <span id="product-price-info"></span><br>
+                                            <span id="product-stock-info"></span><br>
+                                            <span id="product-discount-info"></span>
+                                        </small>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-success w-100">
+                                    <i class="bi bi-cart-check"></i> Buat Transaksi
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <i class="bi bi-receipt-cutoff"></i> Riwayat Transaksi
+                            </h5>
+                            <button class="btn btn-outline-primary btn-sm" onclick="loadTransactions()">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Produk</th>
+                                            <th>Jumlah</th>
+                                            <th>Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="transactions-table">
+                                        <tr>
+                                            <td colspan="4" class="text-center">
+                                                <div class="loading">
+                                                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                                                    Loading...
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="editProductModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Produk</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="edit-product-form">
+                        <input type="hidden" id="edit-product-id">
+                        <div class="mb-3">
+                            <label for="edit-product-name" class="form-label">Nama Produk</label>
+                            <input type="text" class="form-control" id="edit-product-name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit-product-price" class="form-label">Harga</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rp</span>
+                                <input type="number" class="form-control" id="edit-product-price" min="1" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit-product-category" class="form-label">Kategori</label>
+                            <select class="form-select" id="edit-product-category" required>
+                                <option value="Sabun">Sabun</option>
+                                <option value="Sembako">Sembako</option>
+                                <option value="Food">Food</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit-product-stock" class="form-label">Stok</label>
+                            <input type="number" class="form-control" id="edit-product-stock" min="0" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-primary" onclick="updateProduct()">Simpan</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Configuration
+        const API_BASE = 'http://localhost:3000/api/products';
+        const discountRates = { "Sabun": 0.1, "Sembako": 0.3, "Food": 0.05 };
+
+        // Global state
+        let products = [];
+        let transactions = [];
+        let isOnline = false;
+        let connectionStatus = document.getElementById('connection-status');
+        let offlineWarning = document.getElementById('offline-warning');
+
+        // Offline storage keys
+        const STORAGE_KEYS = {
+            products: 'offline_products',
+            transactions: 'offline_transactions'
+        };
+
+        // Utility functions
+        function showAlert(message, type = 'success') {
+            const alertContainer = document.getElementById('alert-container');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type} alert-dismissible fade show`;
+            alert.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            alertContainer.appendChild(alert);
+            
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR',
+                minimumFractionDigits: 0
+            }).format(amount);
+        }
+
+        function getStockClass(stock) {
+            if (stock <= 5) return 'stock-low';
+            if (stock <= 15) return 'stock-medium';
+            return 'stock-high';
+        }
+
+        function getCategoryBadgeClass(category) {
+            const classes = {
+                'Sabun': 'bg-primary',
+                'Sembako': 'bg-success',
+                'Food': 'bg-warning'
+            };
+            return classes[category] || 'bg-secondary';
+        }
+
+        function generateId() {
+            return Date.now().toString() + Math.random().toString(36).substr(2, 5);
+        }
+
+        // Connection status management
+        function updateConnectionStatus(online) {
+            isOnline = online;
+            if (online) {
+                connectionStatus.className = 'connection-status status-connected';
+                connectionStatus.innerHTML = '<i class="bi bi-wifi"></i> Terhubung ke server';
+                connectionStatus.style.display = 'block';
+                offlineWarning.style.display = 'none';
+                setTimeout(() => {
+                    connectionStatus.style.display = 'none';
+                }, 3000);
+            } else {
+                connectionStatus.className = 'connection-status status-disconnected';
+                connectionStatus.innerHTML = '<i class="bi bi-wifi-off"></i> Tidak terhubung ke server';
+                connectionStatus.style.display = 'block';
+                offlineWarning.style.display = 'block';
+            }
+        }
+
+        // Offline storage functions
+        function saveToOfflineStorage(key, data) {
+            try {
+                // Using variables instead of localStorage for Claude.ai compatibility
+                if (key === STORAGE_KEYS.products) {
+                    window.offlineProducts = data;
+                } else if (key === STORAGE_KEYS.transactions) {
+                    window.offlineTransactions = data;
+                }
+            } catch (error) {
+                console.warn('Cannot save to offline storage:', error);
+            }
+        }
+
+        function loadFromOfflineStorage(key) {
+            try {
+                if (key === STORAGE_KEYS.products) {
+                    return window.offlineProducts || [];
+                } else if (key === STORAGE_KEYS.transactions) {
+                    return window.offlineTransactions || [];
+                }
+                return [];
+            } catch (error) {
+                console.warn('Cannot load from offline storage:', error);
+                return [];
+            }
+        }
+
+        // Navigation functions
+        function showProducts() {
+            document.getElementById('products-section').style.display = 'block';
+            document.getElementById('transactions-section').style.display = 'none';
+            document.querySelector('a[onclick="showProducts()"]').classList.add('active');
+            document.querySelector('a[onclick="showTransactions()"]').classList.remove('active');
+            loadProducts();
+        }
+
+        function showTransactions() {
+            document.getElementById('products-section').style.display = 'none';
+            document.getElementById('transactions-section').style.display = 'block';
+            document.querySelector('a[onclick="showProducts()"]').classList.remove('active');
+            document.querySelector('a[onclick="showTransactions()"]').classList.add('active');
+            loadTransactions();
+            loadProductsForTransaction();
+        }
+
+        // Enhanced API call function with better error handling
+        async function apiCall(endpoint, options = {}) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+            try {
+                console.log(`Making API call to: ${API_BASE}${endpoint}`);
+                
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    signal: controller.signal,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    ...options
+                });
+
+                clearTimeout(timeoutId);
+                console.log(`Response status: ${response.status}`);
+
+                if (!response.ok) {
+                    let errorMessage = `HTTP error! status: ${response.status}`;
+                    try {
+                        const error = await response.json();
+                        errorMessage = error.error || error.message || errorMessage;
+                    } catch (e) {
+                        errorMessage = response.statusText || errorMessage;
+                    }
+                    throw new Error(errorMessage);
+                }
+
+                if (response.status === 204) return null;
+                return await response.json();
+            } catch (error) {
+                clearTimeout(timeoutId);
+                console.error('API Error:', error);
+                
+                // More specific error handling
+                if (error.name === 'AbortError') {
+                    throw new Error('Request timeout. Server might be slow or unavailable.');
+                }
+                
+                if (error instanceof TypeError && error.message.includes('fetch')) {
+                    throw new Error('Cannot connect to server. Please check if the backend is running on http://localhost:3000');
+                }
+                
+                if (error.message.includes('ECONNREFUSED') || error.message.includes('NetworkError')) {
+                    throw new Error('Connection refused. Make sure the backend server is running on port 3000.');
+                }
+                
+                throw error;
+            }
+        }
+
+        // Test connection function
+        async function testConnection() {
+            try {
+                showAlert('Testing connection...', 'info');
+                await apiCall('/products');
+                updateConnectionStatus(true);
+                showAlert('Connection successful! Backend is working.', 'success');
+                // Reload data when connection is restored
+                loadProducts();
+                loadTransactions();
+            } catch (error) {
+                updateConnectionStatus(false);
+                showAlert(`Connection failed: ${error.message}`, 'danger');
+                console.error('Connection test failed:', error);
+            }
+        }
+
+        // Enhanced product functions with offline support
+        async function loadProducts() {
+            try {
+                const tbody = document.getElementById('products-table');
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading...</td></tr>';
+                
+                try {
+                    products = await apiCall('/products');
+                    updateConnectionStatus(true);
+                    saveToOfflineStorage(STORAGE_KEYS.products, products);
+                } catch (error) {
+                    updateConnectionStatus(false);
+                    products = loadFromOfflineStorage(STORAGE_KEYS.products);
+                    if (products.length === 0) {
+                        throw error;
+                    }
+                    showAlert('Loaded from offline data', 'warning');
+                }
+                
+                renderProducts();
+            } catch (error) {
+                showAlert(`Error loading products: ${error.message}`, 'danger');
+                document.getElementById('products-table').innerHTML = '<tr><td colspan="5" class="text-center text-muted">Failed to load products</td></tr>';
+            }
+        }
+
+        function renderProducts() {
+            const tbody = document.getElementById('products-table');
+            
+            if (products.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No products found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = products.map(product => `
+                <tr>
+                    <td>
+                        <strong>${product.name}</strong>
+                        ${!isOnline ? '<small class="text-muted d-block">(Offline)</small>' : ''}
+                    </td>
+                    <td>
+                        <span class="price-display">${formatCurrency(product.price)}</span>
+                    </td>
+                    <td>
+                        <span class="badge category-badge ${getCategoryBadgeClass(product.category)}">${product.category}</span>
+                    </td>
+                    <td>
+                        <span class="${getStockClass(product.stock)}">${product.stock}</span>
+                    </td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" onclick="editProduct('${product.id}')" ${!isOnline ? 'disabled' : ''}>
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="deleteProduct('${product.id}')" ${!isOnline ? 'disabled' : ''}>
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function createProduct(productData) {
+            try {
+                if (isOnline) {
+                    await apiCall('/products', {
+                        method: 'POST',
+                        body: JSON.stringify(productData)
+                    });
+                    showAlert('Product created successfully!');
+                } else {
+                    // Offline mode - add to local storage
+                    const newProduct = {
+                        ...productData,
+                        id: generateId()
+                    };
+                    products.push(newProduct);
+                    saveToOfflineStorage(STORAGE_KEYS.products, products);
+                    showAlert('Product saved offline. Will sync when connection is restored.', 'warning');
+                    renderProducts();
+                }
+                
+                loadProducts();
+                document.getElementById('product-form').reset();
+            } catch (error) {
+                showAlert(`Error creating product: ${error.message}`, 'danger');
+            }
+        }
+
+        function editProduct(id) {
+            const product = products.find(p => p.id === id);
+            if (!product) return;
+
+            if (!isOnline) {
+                showAlert('Edit function requires online connection', 'warning');
+                return;
+            }
+
+            document.getElementById('edit-product-id').value = product.id;
+            document.getElementById('edit-product-name').value = product.name;
+            document.getElementById('edit-product-price').value = product.price;
+            document.getElementById('edit-product-category').value = product.category;
+            document.getElementById('edit-product-stock').value = product.stock;
+
+            new bootstrap.Modal(document.getElementById('editProductModal')).show();
+        }
+
+        async function updateProduct() {
+            const id = document.getElementById('edit-product-id').value;
+            const productData = {
+                name: document.getElementById('edit-product-name').value,
+                price: parseInt(document.getElementById('edit-product-price').value),
+                category: document.getElementById('edit-product-category').value,
+                stock: parseInt(document.getElementById('edit-product-stock').value)
+            };
+
+            try {
+                await apiCall(`/products/${id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(productData)
+                });
+                showAlert('Product updated successfully!');
+                loadProducts();
+                document.querySelector('[data-bs-dismiss="modal"]').click();
+            } catch (error) {
+                showAlert(`Error updating product: ${error.message}`, 'danger');
+            }
+        }
+
+        async function deleteProduct(id) {
+            if (!confirm('Are you sure you want to delete this product?')) return;
+
+            if (!isOnline) {
+                showAlert('Delete function requires online connection', 'warning');
+                return;
+            }
+
+            try {
+                await apiCall(`/products/${id}`, { method: 'DELETE' });
+                showAlert('Product deleted successfully!');
+                loadProducts();
+            } catch (error) {
+                showAlert(`Error deleting product: ${error.message}`, 'danger');
+            }
+        }
+
+        // Enhanced transaction functions
+        async function loadTransactions() {
+            try {
+                const tbody = document.getElementById('transactions-table');
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading...</td></tr>';
+                
+                try {
+                    transactions = await apiCall('/transactions');
+                    updateConnectionStatus(true);
+                    saveToOfflineStorage(STORAGE_KEYS.transactions, transactions);
+                } catch (error) {
+                    updateConnectionStatus(false);
+                    transactions = loadFromOfflineStorage(STORAGE_KEYS.transactions);
+                    if (transactions.length === 0) {
+                        throw error;
+                    }
+                    showAlert('Loaded from offline data', 'warning');
+                }
+                
+                renderTransactions();
+            } catch (error) {
+                showAlert(`Error loading transactions: ${error.message}`, 'danger');
+                document.getElementById('transactions-table').innerHTML = '<tr><td colspan="4" class="text-center text-muted">Failed to load transactions</td></tr>';
+            }
+        }
+
+        function renderTransactions() {
+            const tbody = document.getElementById('transactions-table');
+            
+            if (transactions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No transactions found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = transactions.map(transaction => {
+                const product = products.find(p => p.id === transaction.productId);
+                const productName = product ? product.name : `Product ${transaction.productId}`;
+                
+                return `
+                    <tr>
+                        <td>
+                            <code>${transaction.id}</code>
+                            ${!isOnline ? '<small class="text-muted d-block">(Offline)</small>' : ''}
+                        </td>
+                        <td>${productName}</td>
+                        <td>${transaction.quantity}</td>
+                        <td><span class="price-display">${formatCurrency(transaction.total)}</span></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function loadProductsForTransaction() {
+            try {
+                if (products.length === 0) {
+                    await loadProducts();
+                }
+                
+                const select = document.getElementById('transaction-product');
+                const availableProducts = products.filter(p => p.stock > 0);
+                
+                select.innerHTML = '<option value="">Pilih Produk</option>' +
+                    availableProducts.map(product => 
+                        `<option value="${product.id}">${product.name} (Stok: ${product.stock})</option>`
+                    ).join('');
+                    
+                if (availableProducts.length === 0) {
+                    select.innerHTML = '<option value="">Tidak ada produk dengan stok tersedia</option>';
+                }
+            } catch (error) {
+                showAlert(`Error loading products for transaction: ${error.message}`, 'danger');
+            }
+        }
+
+        async function createTransaction(transactionData) {
+            try {
+                if (isOnline) {
+                    await apiCall('/transactions', {
+                        method: 'POST',
+                        body: JSON.stringify(transactionData)
+                    });
+                    showAlert('Transaction created successfully!');
+                } else {
+                    // Offline mode
+                    const product = products.find(p => p.id === transactionData.productId);
+                    if (!product || product.stock < transactionData.quantity) {
+                        throw new Error('Product not available or insufficient stock');
+                    }
+                    
+                    // Calculate total with discount
+                    const discount = product.price * (discountRates[product.category] || 0);
+                    const finalPrice = product.price - discount;
+                    const total = finalPrice * transactionData.quantity;
+                    
+                    const newTransaction = {
+                        id: generateId(),
+                        productId: transactionData.productId,
+                        quantity: transactionData.quantity,
+                        total: total
+                    };
+                    
+                    // Update product stock
+                    product.stock -= transactionData.quantity;
+                    
+                    // Save transaction and updated products
+                    transactions.push(newTransaction);
+                    saveToOfflineStorage(STORAGE_KEYS.transactions, transactions);
+                    saveToOfflineStorage(STORAGE_KEYS.products, products);
+                    
+                    showAlert('Transaction saved offline. Will sync when connection is restored.', 'warning');
+                    renderTransactions();
+                    renderProducts();
+                }
+                
+                loadTransactions();
+                loadProductsForTransaction();
+                document.getElementById('transaction-form').reset();
+                document.getElementById('product-info').style.display = 'none';
+            } catch (error) {
+                showAlert(`Error creating transaction: ${error.message}`, 'danger');
+            }
+        }
+
+        // Event listeners
+        document.getElementById('product-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const productData = {
+                name: document.getElementById('product-name').value,
+                price: parseInt(document.getElementById('product-price').value),
+                category: document.getElementById('product-category').value,
+                stock: parseInt(document.getElementById('product-stock').value)
+            };
+            createProduct(productData);
+        });
+
+        document.getElementById('transaction-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const transactionData = {
+                productId: document.getElementById('transaction-product').value,
+                quantity: parseInt(document.getElementById('transaction-quantity').value)
+            };
+            createTransaction(transactionData);
+        });
+
+        document.getElementById('transaction-product').addEventListener('change', function() {
+            const productId = this.value;
+            const product = products.find(p => p.id === productId);
+            const info = document.getElementById('product-info');
+            
+            if (product) {
+                const discount = product.price * (discountRates[product.category] || 0);
+                const finalPrice = product.price - discount;
+                
+                document.getElementById('product-price-info').textContent = `Harga: ${formatCurrency(product.price)}`;
+                document.getElementById('product-stock-info').textContent = `Stok tersedia: ${product.stock}`;
+                document.getElementById('product-discount-info').textContent = `Harga setelah diskon: ${formatCurrency(finalPrice)} (${((discountRates[product.category] || 0) * 100)}% off)`;
+                
+                document.getElementById('transaction-quantity').max = product.stock;
+                info.style.display = 'block';
+            } else {
+                info.style.display = 'none';
+            }
+        });
+
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Initializing Product Management System...');
+            
+            // Initialize offline storage
+            window.offlineProducts = window.offlineProducts || [];
+            window.offlineTransactions = window.offlineTransactions || [];
+            
+            // Test initial connection and load data
+            testConnection().then(() => {
+                loadProducts();
+            }).catch(() => {
+                // If initial connection fails, try to load offline data
+                console.log('Initial connection failed, loading offline data...');
+                updateConnectionStatus(false);
+                products = loadFromOfflineStorage(STORAGE_KEYS.products);
+                transactions = loadFromOfflineStorage(STORAGE_KEYS.transactions);
+                
+                if (products.length > 0) {
+                    renderProducts();
+                }
+                if (transactions.length > 0) {
+                    renderTransactions();
+                }
+            });
+        });
+
+        // Periodic connection check
+        setInterval(() => {
+            if (!isOnline) {
+                testConnection().catch(() => {
+                    // Silent fail for periodic checks
+                });
+            }
+        }, 30000); // Check every 30 seconds
+    </script>
+</body>
+</html>
