@@ -51,26 +51,6 @@
         .stock-high {
             color: #28a745;
         }
-        .connection-status {
-            position: fixed;
-            top: 80px;
-            right: 20px;
-            z-index: 1050;
-            padding: 8px 12px;
-            border-radius: 4px;
-            font-size: 0.8em;
-            font-weight: 500;
-        }
-        .status-connected {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .status-disconnected {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
     </style>
 </head>
 <body>
@@ -94,19 +74,10 @@
                             <i class="bi bi-receipt"></i> Transaksi
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#" onclick="testConnection()">
-                            <i class="bi bi-wifi"></i> Test Koneksi
-                        </a>
-                    </li>
                 </ul>
             </div>
         </div>
     </nav>
-
-    <div id="connection-status" class="connection-status status-disconnected" style="display: none;">
-        <i class="bi bi-wifi-off"></i> Tidak terhubung ke server
-    </div>
 
     <div class="container mt-4">
         <div id="alert-container"></div>
@@ -317,13 +288,12 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
     <script>
         // Configuration
-        const API_BASE = 'http://localhost:3000/api/products';
+        const API_BASE = 'http://localhost:3000/api';
         const discountRates = { "Sabun": 0.1, "Sembako": 0.3, "Food": 0.05 };
 
         // Global state
         let products = [];
         let transactions = [];
-        let connectionStatus = document.getElementById('connection-status');
 
         // Utility functions
         function showAlert(message, type = 'success') {
@@ -364,22 +334,6 @@
             return classes[category] || 'bg-secondary';
         }
 
-        // Connection status management
-        function updateConnectionStatus(online) {
-            if (online) {
-                connectionStatus.className = 'connection-status status-connected';
-                connectionStatus.innerHTML = '<i class="bi bi-wifi"></i> Terhubung ke server';
-                connectionStatus.style.display = 'block';
-                setTimeout(() => {
-                    connectionStatus.style.display = 'none';
-                }, 3000);
-            } else {
-                connectionStatus.className = 'connection-status status-disconnected';
-                connectionStatus.innerHTML = '<i class="bi bi-wifi-off"></i> Tidak terhubung ke server';
-                connectionStatus.style.display = 'block';
-            }
-        }
-
         // Navigation functions
         function showProducts() {
             document.getElementById('products-section').style.display = 'block';
@@ -401,7 +355,7 @@
         // API call function
         async function apiCall(endpoint, options = {}) {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
 
             try {
                 console.log(`Making API call to: ${API_BASE}${endpoint}`);
@@ -422,7 +376,7 @@
                     let errorMessage = `HTTP error! status: ${response.status}`;
                     try {
                         const error = await response.json();
-                        errorMessage = error.error || error.message || errorMessage;
+                        errorMessage = error.message || error.error || errorMessage;
                     } catch (e) {
                         errorMessage = response.statusText || errorMessage;
                     }
@@ -430,12 +384,14 @@
                 }
 
                 if (response.status === 204) return null;
-                return await response.json();
+                
+                const result = await response.json();
+                // Backend mengembalikan data dalam format {success, message, data}
+                return result.data || result;
             } catch (error) {
                 clearTimeout(timeoutId);
                 console.error('API Error:', error);
                 
-                // More specific error handling
                 if (error.name === 'AbortError') {
                     throw new Error('Request timeout. Server might be slow or unavailable.');
                 }
@@ -444,27 +400,7 @@
                     throw new Error('Cannot connect to server. Please check if the backend is running on http://localhost:3000');
                 }
                 
-                if (error.message.includes('ECONNREFUSED') || error.message.includes('NetworkError')) {
-                    throw new Error('Connection refused. Make sure the backend server is running on port 3000.');
-                }
-                
                 throw error;
-            }
-        }
-
-        // Test connection function
-        async function testConnection() {
-            try {
-                showAlert('Testing connection...', 'info');
-                await apiCall('/products');
-                updateConnectionStatus(true);
-                showAlert('Connection successful! Backend is working.', 'success');
-                loadProducts();
-                loadTransactions();
-            } catch (error) {
-                updateConnectionStatus(false);
-                showAlert(`Connection failed: ${error.message}`, 'danger');
-                console.error('Connection test failed:', error);
             }
         }
 
@@ -475,10 +411,8 @@
                 tbody.innerHTML = '<tr><td colspan="5" class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading...</td></tr>';
                 
                 products = await apiCall('/products');
-                updateConnectionStatus(true);
                 renderProducts();
             } catch (error) {
-                updateConnectionStatus(false);
                 showAlert(`Error loading products: ${error.message}`, 'danger');
                 document.getElementById('products-table').innerHTML = '<tr><td colspan="5" class="text-center text-muted">Failed to load products</td></tr>';
             }
@@ -580,10 +514,8 @@
                 tbody.innerHTML = '<tr><td colspan="4" class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading...</td></tr>';
                 
                 transactions = await apiCall('/transactions');
-                updateConnectionStatus(true);
                 renderTransactions();
             } catch (error) {
-                updateConnectionStatus(false);
                 showAlert(`Error loading transactions: ${error.message}`, 'danger');
                 document.getElementById('transactions-table').innerHTML = '<tr><td colspan="4" class="text-center text-muted">Failed to load transactions</td></tr>';
             }
@@ -642,6 +574,7 @@
                 });
                 showAlert('Transaction created successfully!');
                 loadTransactions();
+                loadProducts(); // Refresh products to update stock
                 loadProductsForTransaction();
                 document.getElementById('transaction-form').reset();
                 document.getElementById('product-info').style.display = 'none';
@@ -694,7 +627,7 @@
         // Initialize application
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Initializing Product Management System...');
-            testConnection();
+            loadProducts();
         });
     </script>
 </body>
