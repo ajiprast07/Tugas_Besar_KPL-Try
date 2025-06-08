@@ -71,14 +71,6 @@
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
-        .offline-mode {
-            background-color: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeaa7;
-            padding: 1rem;
-            border-radius: 0.375rem;
-            margin-bottom: 1rem;
-        }
     </style>
 </head>
 <body>
@@ -118,14 +110,6 @@
 
     <div class="container mt-4">
         <div id="alert-container"></div>
-        
-        <div id="offline-warning" class="offline-mode" style="display: none;">
-            <i class="bi bi-exclamation-triangle"></i>
-            <strong>Mode Offline:</strong> Tidak dapat terhubung ke server backend. Data akan disimpan sementara di browser dan akan hilang saat halaman di-refresh.
-            <button class="btn btn-sm btn-warning ms-2" onclick="testConnection()">
-                <i class="bi bi-arrow-clockwise"></i> Test Koneksi
-            </button>
-        </div>
 
         <div id="products-section">
             <div class="row">
@@ -339,15 +323,7 @@
         // Global state
         let products = [];
         let transactions = [];
-        let isOnline = false;
         let connectionStatus = document.getElementById('connection-status');
-        let offlineWarning = document.getElementById('offline-warning');
-
-        // Offline storage keys
-        const STORAGE_KEYS = {
-            products: 'offline_products',
-            transactions: 'offline_transactions'
-        };
 
         // Utility functions
         function showAlert(message, type = 'success') {
@@ -388,18 +364,12 @@
             return classes[category] || 'bg-secondary';
         }
 
-        function generateId() {
-            return Date.now().toString() + Math.random().toString(36).substr(2, 5);
-        }
-
         // Connection status management
         function updateConnectionStatus(online) {
-            isOnline = online;
             if (online) {
                 connectionStatus.className = 'connection-status status-connected';
                 connectionStatus.innerHTML = '<i class="bi bi-wifi"></i> Terhubung ke server';
                 connectionStatus.style.display = 'block';
-                offlineWarning.style.display = 'none';
                 setTimeout(() => {
                     connectionStatus.style.display = 'none';
                 }, 3000);
@@ -407,35 +377,6 @@
                 connectionStatus.className = 'connection-status status-disconnected';
                 connectionStatus.innerHTML = '<i class="bi bi-wifi-off"></i> Tidak terhubung ke server';
                 connectionStatus.style.display = 'block';
-                offlineWarning.style.display = 'block';
-            }
-        }
-
-        // Offline storage functions
-        function saveToOfflineStorage(key, data) {
-            try {
-                // Using variables instead of localStorage for Claude.ai compatibility
-                if (key === STORAGE_KEYS.products) {
-                    window.offlineProducts = data;
-                } else if (key === STORAGE_KEYS.transactions) {
-                    window.offlineTransactions = data;
-                }
-            } catch (error) {
-                console.warn('Cannot save to offline storage:', error);
-            }
-        }
-
-        function loadFromOfflineStorage(key) {
-            try {
-                if (key === STORAGE_KEYS.products) {
-                    return window.offlineProducts || [];
-                } else if (key === STORAGE_KEYS.transactions) {
-                    return window.offlineTransactions || [];
-                }
-                return [];
-            } catch (error) {
-                console.warn('Cannot load from offline storage:', error);
-                return [];
             }
         }
 
@@ -457,7 +398,7 @@
             loadProductsForTransaction();
         }
 
-        // Enhanced API call function with better error handling
+        // API call function
         async function apiCall(endpoint, options = {}) {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
@@ -518,7 +459,6 @@
                 await apiCall('/products');
                 updateConnectionStatus(true);
                 showAlert('Connection successful! Backend is working.', 'success');
-                // Reload data when connection is restored
                 loadProducts();
                 loadTransactions();
             } catch (error) {
@@ -528,27 +468,17 @@
             }
         }
 
-        // Enhanced product functions with offline support
+        // Product functions
         async function loadProducts() {
             try {
                 const tbody = document.getElementById('products-table');
                 tbody.innerHTML = '<tr><td colspan="5" class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading...</td></tr>';
                 
-                try {
-                    products = await apiCall('/products');
-                    updateConnectionStatus(true);
-                    saveToOfflineStorage(STORAGE_KEYS.products, products);
-                } catch (error) {
-                    updateConnectionStatus(false);
-                    products = loadFromOfflineStorage(STORAGE_KEYS.products);
-                    if (products.length === 0) {
-                        throw error;
-                    }
-                    showAlert('Loaded from offline data', 'warning');
-                }
-                
+                products = await apiCall('/products');
+                updateConnectionStatus(true);
                 renderProducts();
             } catch (error) {
+                updateConnectionStatus(false);
                 showAlert(`Error loading products: ${error.message}`, 'danger');
                 document.getElementById('products-table').innerHTML = '<tr><td colspan="5" class="text-center text-muted">Failed to load products</td></tr>';
             }
@@ -564,25 +494,16 @@
 
             tbody.innerHTML = products.map(product => `
                 <tr>
-                    <td>
-                        <strong>${product.name}</strong>
-                        ${!isOnline ? '<small class="text-muted d-block">(Offline)</small>' : ''}
-                    </td>
-                    <td>
-                        <span class="price-display">${formatCurrency(product.price)}</span>
-                    </td>
-                    <td>
-                        <span class="badge category-badge ${getCategoryBadgeClass(product.category)}">${product.category}</span>
-                    </td>
-                    <td>
-                        <span class="${getStockClass(product.stock)}">${product.stock}</span>
-                    </td>
+                    <td><strong>${product.name}</strong></td>
+                    <td><span class="price-display">${formatCurrency(product.price)}</span></td>
+                    <td><span class="badge category-badge ${getCategoryBadgeClass(product.category)}">${product.category}</span></td>
+                    <td><span class="${getStockClass(product.stock)}">${product.stock}</span></td>
                     <td>
                         <div class="btn-group btn-group-sm">
-                            <button class="btn btn-outline-primary" onclick="editProduct('${product.id}')" ${!isOnline ? 'disabled' : ''}>
+                            <button class="btn btn-outline-primary" onclick="editProduct('${product.id}')">
                                 <i class="bi bi-pencil"></i>
                             </button>
-                            <button class="btn btn-outline-danger" onclick="deleteProduct('${product.id}')" ${!isOnline ? 'disabled' : ''}>
+                            <button class="btn btn-outline-danger" onclick="deleteProduct('${product.id}')">
                                 <i class="bi bi-trash"></i>
                             </button>
                         </div>
@@ -593,24 +514,11 @@
 
         async function createProduct(productData) {
             try {
-                if (isOnline) {
-                    await apiCall('/products', {
-                        method: 'POST',
-                        body: JSON.stringify(productData)
-                    });
-                    showAlert('Product created successfully!');
-                } else {
-                    // Offline mode - add to local storage
-                    const newProduct = {
-                        ...productData,
-                        id: generateId()
-                    };
-                    products.push(newProduct);
-                    saveToOfflineStorage(STORAGE_KEYS.products, products);
-                    showAlert('Product saved offline. Will sync when connection is restored.', 'warning');
-                    renderProducts();
-                }
-                
+                await apiCall('/products', {
+                    method: 'POST',
+                    body: JSON.stringify(productData)
+                });
+                showAlert('Product created successfully!');
                 loadProducts();
                 document.getElementById('product-form').reset();
             } catch (error) {
@@ -621,11 +529,6 @@
         function editProduct(id) {
             const product = products.find(p => p.id === id);
             if (!product) return;
-
-            if (!isOnline) {
-                showAlert('Edit function requires online connection', 'warning');
-                return;
-            }
 
             document.getElementById('edit-product-id').value = product.id;
             document.getElementById('edit-product-name').value = product.name;
@@ -661,11 +564,6 @@
         async function deleteProduct(id) {
             if (!confirm('Are you sure you want to delete this product?')) return;
 
-            if (!isOnline) {
-                showAlert('Delete function requires online connection', 'warning');
-                return;
-            }
-
             try {
                 await apiCall(`/products/${id}`, { method: 'DELETE' });
                 showAlert('Product deleted successfully!');
@@ -675,27 +573,17 @@
             }
         }
 
-        // Enhanced transaction functions
+        // Transaction functions
         async function loadTransactions() {
             try {
                 const tbody = document.getElementById('transactions-table');
                 tbody.innerHTML = '<tr><td colspan="4" class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading...</td></tr>';
                 
-                try {
-                    transactions = await apiCall('/transactions');
-                    updateConnectionStatus(true);
-                    saveToOfflineStorage(STORAGE_KEYS.transactions, transactions);
-                } catch (error) {
-                    updateConnectionStatus(false);
-                    transactions = loadFromOfflineStorage(STORAGE_KEYS.transactions);
-                    if (transactions.length === 0) {
-                        throw error;
-                    }
-                    showAlert('Loaded from offline data', 'warning');
-                }
-                
+                transactions = await apiCall('/transactions');
+                updateConnectionStatus(true);
                 renderTransactions();
             } catch (error) {
+                updateConnectionStatus(false);
                 showAlert(`Error loading transactions: ${error.message}`, 'danger');
                 document.getElementById('transactions-table').innerHTML = '<tr><td colspan="4" class="text-center text-muted">Failed to load transactions</td></tr>';
             }
@@ -715,10 +603,7 @@
                 
                 return `
                     <tr>
-                        <td>
-                            <code>${transaction.id}</code>
-                            ${!isOnline ? '<small class="text-muted d-block">(Offline)</small>' : ''}
-                        </td>
+                        <td><code>${transaction.id}</code></td>
                         <td>${productName}</td>
                         <td>${transaction.quantity}</td>
                         <td><span class="price-display">${formatCurrency(transaction.total)}</span></td>
@@ -751,44 +636,11 @@
 
         async function createTransaction(transactionData) {
             try {
-                if (isOnline) {
-                    await apiCall('/transactions', {
-                        method: 'POST',
-                        body: JSON.stringify(transactionData)
-                    });
-                    showAlert('Transaction created successfully!');
-                } else {
-                    // Offline mode
-                    const product = products.find(p => p.id === transactionData.productId);
-                    if (!product || product.stock < transactionData.quantity) {
-                        throw new Error('Product not available or insufficient stock');
-                    }
-                    
-                    // Calculate total with discount
-                    const discount = product.price * (discountRates[product.category] || 0);
-                    const finalPrice = product.price - discount;
-                    const total = finalPrice * transactionData.quantity;
-                    
-                    const newTransaction = {
-                        id: generateId(),
-                        productId: transactionData.productId,
-                        quantity: transactionData.quantity,
-                        total: total
-                    };
-                    
-                    // Update product stock
-                    product.stock -= transactionData.quantity;
-                    
-                    // Save transaction and updated products
-                    transactions.push(newTransaction);
-                    saveToOfflineStorage(STORAGE_KEYS.transactions, transactions);
-                    saveToOfflineStorage(STORAGE_KEYS.products, products);
-                    
-                    showAlert('Transaction saved offline. Will sync when connection is restored.', 'warning');
-                    renderTransactions();
-                    renderProducts();
-                }
-                
+                await apiCall('/transactions', {
+                    method: 'POST',
+                    body: JSON.stringify(transactionData)
+                });
+                showAlert('Transaction created successfully!');
                 loadTransactions();
                 loadProductsForTransaction();
                 document.getElementById('transaction-form').reset();
@@ -842,38 +694,8 @@
         // Initialize application
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Initializing Product Management System...');
-            
-            // Initialize offline storage
-            window.offlineProducts = window.offlineProducts || [];
-            window.offlineTransactions = window.offlineTransactions || [];
-            
-            // Test initial connection and load data
-            testConnection().then(() => {
-                loadProducts();
-            }).catch(() => {
-                // If initial connection fails, try to load offline data
-                console.log('Initial connection failed, loading offline data...');
-                updateConnectionStatus(false);
-                products = loadFromOfflineStorage(STORAGE_KEYS.products);
-                transactions = loadFromOfflineStorage(STORAGE_KEYS.transactions);
-                
-                if (products.length > 0) {
-                    renderProducts();
-                }
-                if (transactions.length > 0) {
-                    renderTransactions();
-                }
-            });
+            testConnection();
         });
-
-        // Periodic connection check
-        setInterval(() => {
-            if (!isOnline) {
-                testConnection().catch(() => {
-                    // Silent fail for periodic checks
-                });
-            }
-        }, 30000); // Check every 30 seconds
     </script>
 </body>
 </html>
